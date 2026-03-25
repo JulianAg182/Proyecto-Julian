@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modelo Financiero — Julián</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0D0D14; color: #E8E8F0; font-family: system-ui, sans-serif; }
+input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+input { color-scheme: dark; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1A1A2A; }
+::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+const SK = 'pj_fin_v1';
+const DS = {
+  salario_quincenal: 19190.10,
+  bono_monto: 83000,
+  bono_fecha: '2026-05-01',
+  bono_recibido: false,
+  deudas: {
+    nubank: { nombre: 'Nubank', saldo: 25990, pago_min: 2000, interes: 36, prioridad: 1, liquidada: false },
+    banamex: { nombre: 'Banamex', saldo: 38000, pago_min: 1460, interes: 45, prioridad: 2, liquidada: false },
+    prestamo1: { nombre: 'Préstamo 1', saldo: 7308, pago_min: 2180, interes: 20, prioridad: 3, liquidada: false },
+    bbva: { nombre: 'BBVA', saldo: 28885, pago_min: 1072, interes: 25, prioridad: 4, liquidada: false },
+    prestamo2: { nombre: 'Préstamo 2', saldo: 83157, pago_min: 4600, interes: 22, prioridad: 5, liquidada: false },
+  },
+  gastos_fijos: {
+    telefono: { nombre: 'Teléfono', monto: 1600 },
+    gym: { nombre: 'Gym', monto: 1400 },
+    agua: { nombre: 'Agua', monto: 500 },
+    nutriologa: { nombre: 'Nutrióloga', monto: 750 },
+    streaming: { nombre: 'Streaming', monto: 1450 },
+    hobbies: { nombre: 'Subs hobbies', monto: 750 },
+    gasolina: { nombre: 'Gasolina', monto: 500 },
+  },
+  presupuesto_variable: {
+    comida_semana: { nombre: 'Comida entre semana', monto: 7700 },
+    comida_finde: { nombre: 'Comida finde / familia', monto: 2000 },
+    ropa: { nombre: 'Ropa y compras', monto: 1000 },
+    entretenimiento: { nombre: 'Entretenimiento / amigos', monto: 800 },
+    hogar: { nombre: 'Contribución hogar', monto: 500 },
+    imprevistos: { nombre: 'Imprevistos', monto: 500 },
+  },
+  metas_ahorro: {
+    retiro: { nombre: 'Retiro / Largo plazo', porcentaje: 40, activa: false },
+    viajes: { nombre: 'Viajes / Experiencias', porcentaje: 30, activa: false },
+    emergencia: { nombre: 'Fondo de emergencia', porcentaje: 20, activa: false },
+    arte: { nombre: 'Inversión arte / equipo', porcentaje: 10, activa: false },
+  },
+  registro_gastos: {},
+  quincena_actual: '2026-03-25',
+};
+
+function qk(fecha) {
+  const d = new Date(fecha), day = d.getDate(), mo = String(d.getMonth()+1).padStart(2,'0'), yr = d.getFullYear();
+  return `${yr}-${mo}-${day<=15?'10':'25'}`;
+}
+function fmx(n) { return '$' + Math.round(n||0).toLocaleString('es-MX'); }
+function fmxd(n) { return '$' + (n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function App() {
+  const [tab, setTab] = useState('resumen');
+  const [S, setS] = useState(null);
+  const [toast, setToast] = useState('');
+  const [pm, setPm] = useState(18);
+
+  useEffect(() => {
+    try { const r = localStorage.getItem(SK); setS(r ? JSON.parse(r) : JSON.parse(JSON.stringify(DS))); }
+    catch { setS(JSON.parse(JSON.stringify(DS))); }
+  }, []);
+
+  const save = useCallback((ns) => {
+    try { localStorage.setItem(SK, JSON.stringify(ns)); setToast('✓ Guardado'); setTimeout(()=>setToast(''),1200); }
+    catch { setToast('Error al guardar'); setTimeout(()=>setToast(''),2000); }
+  }, []);
+
+  const upd = useCallback((fn) => {
+    setS(p => { const n = JSON.parse(JSON.stringify(p)); fn(n); save(n); return n; });
+  }, [save]);
+
+  if (!S) return React.createElement('div', {style:{display:'flex',alignItems:'center',justifyContent:'center',height:300,color:'#7070A0'}}, 'Cargando...');
+
+  const V = {bg:'#0D0D14',s1:'#13131E',s2:'#1A1A2A',s3:'#22223A',bo:'rgba(255,255,255,0.08)',bo2:'rgba(255,255,255,0.16)',tx:'#E8E8F0',mu:'#7070A0',re:'#E94560',or:'#E67E22',bl:'#4A90D9',gr:'#2ECC71',pu:'#9B59B6',go:'#F0C040',te:'#1ABC9C'};
+  const card = {background:V.s1,border:`1px solid ${V.bo}`,borderRadius:12,padding:18,marginBottom:14};
+  const inp = {background:V.s2,border:`1px solid ${V.bo2}`,borderRadius:6,color:V.tx,fontFamily:'inherit',fontSize:13,padding:'7px 10px',width:'100%',boxSizing:'border-box',outline:'none'};
+  const inpN = {...inp,width:120,textAlign:'right'};
+
+  const salMen = S.salario_quincenal * 2;
+  const totFijos = Object.values(S.gastos_fijos).reduce((a,g)=>a+g.monto,0);
+  const totVar = Object.values(S.presupuesto_variable).reduce((a,g)=>a+g.monto,0);
+  const totDeuda = Object.values(S.deudas).filter(d=>!d.liquidada).reduce((a,d)=>a+d.saldo,0);
+  const pagosMen = Object.values(S.deudas).filter(d=>!d.liquidada).reduce((a,d)=>a+d.pago_min,0);
+  const totEgr = totFijos + totVar + pagosMen;
+  const flujo = salMen - totEgr;
+
+  function calcProy() {
+    let saldos = Object.entries(S.deudas).filter(([,d])=>!d.liquidada).map(([k,d])=>({...d,key:k})).sort((a,b)=>a.prioridad-b.prioridad);
+    let meses=[], ahorroAcum=0, liquidadoEn=null;
+    const extra = Math.max(0,flujo);
+    const bonoPend = !S.bono_recibido ? S.bono_monto : 0;
+    const bonoMes = S.bono_fecha ? Math.max(0,Math.ceil((new Date(S.bono_fecha)-new Date())/(1000*60*60*24*30))) : null;
+    for(let m=0;m<pm;m++){
+      let disp = extra;
+      const bonoEste = (bonoMes!==null && m===bonoMes) ? bonoPend : 0;
+      let sl = saldos.map(d=>({...d,saldo:d.saldo*(1+d.interes/100/12)}));
+      sl = sl.map(d=>({...d,saldo:Math.max(0,d.saldo-d.pago_min)}));
+      for(let i=0;i<sl.length;i++){if(sl[i].saldo>0&&disp>0){const p=Math.min(sl[i].saldo,disp);sl[i].saldo-=p;disp-=p;}}
+      if(bonoEste>0){let br=bonoEste;for(let i=0;i<sl.length;i++){if(sl[i].saldo>0&&br>0){const p=Math.min(sl[i].saldo,br);sl[i].saldo-=p;br-=p;}}}
+      const totSl=sl.reduce((a,d)=>a+d.saldo,0);
+      if(totSl<=0&&liquidadoEn===null)liquidadoEn=m+1;
+      const aho=totSl<=0?(pagosMen+extra):0;
+      ahorroAcum+=aho;
+      const f=new Date();f.setMonth(f.getMonth()+m+1);
+      meses.push({mes:m+1,fecha:f.toLocaleString('es',{month:'short',year:'2-digit'}),saldo:Math.max(0,totSl),bono:bonoEste,ahorro:aho,ahorroAcum,liq:totSl<=0});
+      saldos=sl.map(d=>({...d,saldo:Math.max(0,d.saldo)}));
+    }
+    return {meses,liquidadoEn};
+  }
+  const {meses:proy,liquidadoEn} = calcProy();
+
+  const CT = ({c,l}) => (
+    <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:12}}>
+      <div style={{width:7,height:7,borderRadius:'50%',background:c}}/>
+      <span style={{fontSize:11,letterSpacing:2,color:V.mu,textTransform:'uppercase',fontWeight:600}}>{l}</span>
+    </div>
+  );
+  const SC = ({v,l,c}) => (
+    <div style={{background:V.s2,borderRadius:10,padding:'13px 8px',textAlign:'center'}}>
+      <div style={{fontSize:20,fontWeight:700,color:c,lineHeight:1,marginBottom:3}}>{v}</div>
+      <div style={{fontSize:10,color:V.mu,textTransform:'uppercase',letterSpacing:1}}>{l}</div>
+    </div>
+  );
+  const PB = ({p,c,h=7}) => (
+    <div style={{background:V.s3,borderRadius:4,height:h,overflow:'hidden'}}>
+      <div style={{height:'100%',borderRadius:4,width:`${Math.min(100,Math.max(0,p||0))}%`,background:c,transition:'width .3s'}}/>
+    </div>
+  );
+  const Row = ({l,v,c,bold}) => (
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:`1px solid ${V.bo}`}}>
+      <span style={{fontSize:13,color:bold?V.tx:V.mu}}>{l}</span>
+      <span style={{fontSize:13,fontWeight:bold?700:500,color:c||V.tx}}>{v}</span>
+    </div>
+  );
+
+  const TABS=[{id:'resumen',l:'📊 Resumen'},{id:'quincena',l:'💳 Quincena'},{id:'deudas',l:'💰 Deudas'},{id:'gastos',l:'📋 Presupuesto'},{id:'proyeccion',l:'📈 Proyección'},{id:'ahorro',l:'🏦 Ahorro'}];
+
+  function Resumen() {
+    const pct = Math.max(0,Math.round((183340-totDeuda)/183340*100));
+    const alerta = flujo < 0;
+    return (
+      <div>
+        <div style={{background:alerta?'#3D1010':'#0D2D1A',border:`1px solid ${alerta?V.re:V.gr}`,borderRadius:10,padding:'12px 16px',marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:600,color:alerta?V.re:V.gr}}>{alerta?'⚠️ Flujo negativo — revisar gastos':'✅ Flujo positivo esta quincena'}</div>
+          <div style={{fontSize:12,color:V.mu,marginTop:3}}>Flujo libre mensual: <b style={{color:alerta?V.re:V.gr}}>{fmx(flujo)}</b></div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+          <SC v={fmx(salMen)} l="Ingreso mensual" c={V.gr}/>
+          <SC v={fmx(totEgr)} l="Egresos totales" c={V.re}/>
+          <SC v={fmx(flujo)} l="Flujo libre" c={flujo>=0?V.te:V.re}/>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div style={card}>
+            <CT c={V.re} l="Estado de deuda"/>
+            <div style={{fontSize:28,fontWeight:700,color:V.re,marginBottom:8}}>{fmx(totDeuda)}</div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:V.mu,marginBottom:4}}><span>Eliminado</span><span>{pct}%</span></div>
+            <PB p={pct} c={V.gr} h={10}/>
+            <div style={{marginTop:10,fontSize:12,color:V.mu}}>Pagos mínimos/mes: <b style={{color:V.tx}}>{fmx(pagosMen)}</b></div>
+            {liquidadoEn&&<div style={{marginTop:6,fontSize:12,color:V.go}}>Liquidación estimada: mes {liquidadoEn} ({proy[liquidadoEn-1]?.fecha})</div>}
+          </div>
+          <div style={card}>
+            <CT c={V.bl} l="Desglose mensual"/>
+            <Row l="Salario neto" v={fmx(salMen)} c={V.gr} bold/>
+            <Row l="Gastos fijos" v={`-${fmx(totFijos)}`} c={V.or}/>
+            <Row l="Gastos variables" v={`-${fmx(totVar)}`} c={V.or}/>
+            <Row l="Pagos deuda" v={`-${fmx(pagosMen)}`} c={V.re}/>
+            <Row l="Flujo libre" v={fmx(flujo)} c={flujo>=0?V.te:V.re} bold/>
+          </div>
+          <div style={card}>
+            <CT c={V.go} l="Bono esperado"/>
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,color:V.mu,display:'block',marginBottom:4}}>Monto neto estimado (MXN)</label>
+              <input style={inp} type="number" value={S.bono_monto} onChange={e=>upd(s=>{s.bono_monto=parseFloat(e.target.value)||0;})}/>
+            </div>
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,color:V.mu,display:'block',marginBottom:4}}>Fecha esperada</label>
+              <input style={inp} type="date" value={S.bono_fecha} onChange={e=>upd(s=>{s.bono_fecha=e.target.value;})}/>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+              <input type="checkbox" checked={S.bono_recibido} onChange={e=>upd(s=>{s.bono_recibido=e.target.checked;})} style={{width:16,height:16}}/>
+              <span style={{fontSize:13}}>Ya recibí el bono</span>
+            </div>
+            {!S.bono_recibido&&<div style={{padding:'10px 12px',background:V.s3,borderRadius:8}}>
+              <div style={{fontSize:11,color:V.mu}}>Con el bono liquidas:</div>
+              <div style={{fontSize:13,color:V.go,fontWeight:600,marginTop:3}}>Nubank + Banamex + P1 = {fmx(S.deudas.nubank.saldo+S.deudas.banamex.saldo+S.deudas.prestamo1.saldo)}</div>
+              <div style={{fontSize:11,color:V.gr,marginTop:2}}>Remanente: {fmx(S.bono_monto-(S.deudas.nubank.saldo+S.deudas.banamex.saldo+S.deudas.prestamo1.saldo))}</div>
+            </div>}
+          </div>
+          <div style={card}>
+            <CT c={V.pu} l="Próximos hitos"/>
+            {proy.filter(m=>m.bono>0||m.liq).slice(0,4).map((m,i)=>(
+              <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:`1px solid ${V.bo}`}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500,color:m.liq?V.gr:V.go}}>{m.liq?'🎉 Deuda $0':'💰 Bono'} — {m.fecha}</div>
+                  <div style={{fontSize:11,color:V.mu}}>Mes {m.mes}</div>
+                </div>
+                <div style={{fontSize:13,color:m.liq?V.gr:V.go,fontWeight:600}}>{m.bono>0?fmx(m.bono):'¡Libre!'}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function Quincena() {
+    const k = qk(S.quincena_actual);
+    const qd = S.registro_gastos[k]||{};
+    const totReg = Object.values(qd).reduce((a,v)=>a+(v||0),0);
+    const presQ = totVar/2;
+    const dispQ = S.salario_quincenal-(totFijos/2)-(pagosMen/2)-totReg;
+    const cats = Object.entries(S.presupuesto_variable).map(([k2,g])=>({key:k2,nombre:g.nombre,pres:g.monto/2,gast:qd[k2]||0}));
+    return (
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+          <div style={{flex:1}}>
+            <label style={{fontSize:11,color:V.mu,display:'block',marginBottom:4}}>Quincena activa</label>
+            <input style={{...inp,width:180}} type="date" value={S.quincena_actual} onChange={e=>upd(s=>{s.quincena_actual=e.target.value;})}/>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:11,color:V.mu}}>Depósito</div>
+            <div style={{fontSize:22,fontWeight:700,color:V.gr}}>{fmxd(S.salario_quincenal)}</div>
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+          <SC v={fmx(S.salario_quincenal)} l="Ingreso Q" c={V.gr}/>
+          <SC v={fmx(totReg)} l="Gastado" c={V.or}/>
+          <SC v={fmx(dispQ)} l="Disponible" c={dispQ>=0?V.te:V.re}/>
+        </div>
+        <div style={card}>
+          <CT c={V.or} l="Registro de gastos esta quincena"/>
+          {cats.map(cat=>{
+            const p=Math.min(100,(cat.gast/cat.pres)*100), over=cat.gast>cat.pres;
+            return (
+              <div key={cat.key} style={{marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                  <span style={{fontSize:13}}>{cat.nombre}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:11,color:V.mu}}>P: {fmx(cat.pres)}</span>
+                    <input type="number" placeholder="0" value={cat.gast||''} onChange={e=>upd(s=>{if(!s.registro_gastos[k])s.registro_gastos[k]={};s.registro_gastos[k][cat.key]=parseFloat(e.target.value)||0;})} style={{...inpN,width:100}}/>
+                  </div>
+                </div>
+                <PB p={p} c={over?V.re:V.gr}/>
+                {over&&<div style={{fontSize:11,color:V.re,marginTop:3}}>⚠️ Excedido por {fmx(cat.gast-cat.pres)}</div>}
+              </div>
+            );
+          })}
+          <div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${V.bo}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+              <span style={{fontSize:13,color:V.mu}}>Total vs presupuesto</span>
+              <span style={{fontSize:13,fontWeight:600,color:totReg>presQ?V.re:V.gr}}>{fmx(totReg)} / {fmx(presQ)}</span>
+            </div>
+            <PB p={(totReg/presQ)*100} c={totReg>presQ?V.re:V.gr} h={10}/>
+          </div>
+        </div>
+        <div style={card}>
+          <CT c={V.bl} l="Distribución quincena"/>
+          <Row l="Depósito recibido" v={fmxd(S.salario_quincenal)} c={V.gr} bold/>
+          <Row l="Gastos fijos (50%)" v={`-${fmx(totFijos/2)}`} c={V.or}/>
+          <Row l="Pagos deuda (50%)" v={`-${fmx(pagosMen/2)}`} c={V.re}/>
+          <Row l="Gastos variables registrados" v={`-${fmx(totReg)}`} c={V.or}/>
+          <Row l="Disponible restante" v={fmx(dispQ)} c={dispQ>=0?V.te:V.re} bold/>
+        </div>
+      </div>
+    );
+  }
+
+  function Deudas() {
+    const pct = Math.max(0,Math.round((183340-totDeuda)/183340*100));
+    const ORIG = {nubank:25990,banamex:38000,prestamo1:7308,bbva:28885,prestamo2:83157};
+    return (
+      <div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+          <SC v={fmx(totDeuda)} l="Deuda total" c={V.re}/>
+          <SC v={fmx(pagosMen)} l="Pagos/mes" c={V.or}/>
+          <SC v={`${pct}%`} l="Eliminado" c={V.gr}/>
+        </div>
+        <div style={card}>
+          <CT c={V.re} l="Detalle de deudas"/>
+          {Object.entries(S.deudas).map(([k,d])=>{
+            const pctD = Math.max(0,Math.round(((ORIG[k]||d.saldo)-d.saldo)/(ORIG[k]||d.saldo)*100));
+            return (
+              <div key={k} style={{padding:'14px 0',borderBottom:`1px solid ${V.bo}`,opacity:d.liquidada?0.5:1}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:13,fontWeight:600}}>{d.nombre}</span>
+                    <span style={{fontSize:10,padding:'2px 6px',borderRadius:4,background:V.re+'22',color:V.re,fontWeight:600}}>P{d.prioridad}</span>
+                    {d.liquidada&&<span style={{fontSize:10,padding:'2px 6px',borderRadius:4,background:V.gr+'22',color:V.gr,fontWeight:600}}>✓ Liquidada</span>}
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <label style={{fontSize:11,color:V.mu}}>Liquidada</label>
+                    <input type="checkbox" checked={d.liquidada} onChange={e=>upd(s=>{s.deudas[k].liquidada=e.target.checked;if(e.target.checked)s.deudas[k].saldo=0;})} style={{width:15,height:15}}/>
+                  </div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:8}}>
+                  <div>
+                    <div style={{fontSize:10,color:V.mu,marginBottom:3}}>Saldo actual</div>
+                    <input type="number" value={d.saldo} onChange={e=>upd(s=>{s.deudas[k].saldo=parseFloat(e.target.value)||0;})} style={inpN} disabled={d.liquidada}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,color:V.mu,marginBottom:3}}>Pago mín/mes</div>
+                    <input type="number" value={d.pago_min} onChange={e=>upd(s=>{s.deudas[k].pago_min=parseFloat(e.target.value)||0;})} style={inpN} disabled={d.liquidada}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,color:V.mu,marginBottom:3}}>Tasa anual %</div>
+                    <input type="number" value={d.interes} onChange={e=>upd(s=>{s.deudas[k].interes=parseFloat(e.target.value)||0;})} style={inpN} disabled={d.liquidada}/>
+                  </div>
+                </div>
+                {!d.liquidada&&<PB p={pctD} c={V.gr}/>}
+              </div>
+            );
+          })}
+        </div>
+        <div style={card}>
+          <CT c={V.go} l="Plan de ataque con bono"/>
+          <div style={{fontSize:12,color:V.mu,marginBottom:12}}>Con bono de {fmx(S.bono_monto)}</div>
+          {[
+            {d:'Nubank',m:S.deudas.nubank.saldo,ac:S.deudas.nubank.saldo},
+            {d:'Banamex',m:S.deudas.banamex.saldo,ac:S.deudas.nubank.saldo+S.deudas.banamex.saldo},
+            {d:'Préstamo 1',m:S.deudas.prestamo1.saldo,ac:S.deudas.nubank.saldo+S.deudas.banamex.saldo+S.deudas.prestamo1.saldo},
+          ].map((item,i)=>{
+            const ok=item.ac<=S.bono_monto;
+            return (
+              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:`1px solid ${V.bo}`}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:16}}>{ok?'✅':'⚠️'}</span>
+                  <span style={{fontSize:13}}>{item.d}</span>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:13,fontWeight:600,color:ok?V.gr:V.or}}>{fmx(item.m)}</div>
+                  <div style={{fontSize:11,color:V.mu}}>Acum: {fmx(item.ac)}</div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{marginTop:10,padding:'10px 12px',background:V.s3,borderRadius:8}}>
+            <div style={{fontSize:11,color:V.mu}}>Remanente del bono:</div>
+            <div style={{fontSize:18,fontWeight:700,color:V.go,marginTop:3}}>{fmx(Math.max(0,S.bono_monto-(S.deudas.nubank.saldo+S.deudas.banamex.saldo+S.deudas.prestamo1.saldo)))}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function Presupuesto() {
+    return (
+      <div>
+        <div style={card}>
+          <CT c={V.or} l="Gastos fijos mensuales"/>
+          {Object.entries(S.gastos_fijos).map(([k,g])=>(
+            <div key={k} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:`1px solid ${V.bo}`}}>
+              <span style={{fontSize:13}}>{g.nombre}</span>
+              <input type="number" value={g.monto} onChange={e=>upd(s=>{s.gastos_fijos[k].monto=parseFloat(e.target.value)||0;})} style={inpN}/>
+            </div>
+          ))}
+          <Row l="Total fijos" v={fmx(totFijos)} c={V.or} bold/>
+        </div>
+        <div style={card}>
+          <CT c={V.go} l="Presupuesto variable mensual"/>
+          {Object.entries(S.presupuesto_variable).map(([k,g])=>(
+            <div key={k} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:`1px solid ${V.bo}`}}>
+              <span style={{fontSize:13}}>{g.nombre}</span>
+              <input type="number" value={g.monto} onChange={e=>upd(s=>{s.presupuesto_variable[k].monto=parseFloat(e.target.value)||0;})} style={inpN}/>
+            </div>
+          ))}
+          <Row l="Total variable" v={fmx(totVar)} c={V.go} bold/>
+        </div>
+        <div style={card}>
+          <CT c={V.bl} l="Resumen mensual"/>
+          <Row l="Ingreso mensual neto" v={fmx(salMen)} c={V.gr} bold/>
+          <Row l="Gastos fijos" v={`-${fmx(totFijos)}`} c={V.or}/>
+          <Row l="Gastos variables" v={`-${fmx(totVar)}`} c={V.go}/>
+          <Row l="Pagos mínimos deuda" v={`-${fmx(pagosMen)}`} c={V.re}/>
+          <Row l="Flujo libre mensual" v={fmx(flujo)} c={flujo>=0?V.te:V.re} bold/>
+          <Row l="Flujo libre quincenal" v={fmx(flujo/2)} c={flujo>=0?V.te:V.re} bold/>
+        </div>
+      </div>
+    );
+  }
+
+  function Proyeccion() {
+    return (
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+          <span style={{fontSize:13,color:V.mu}}>Horizonte:</span>
+          {[12,18,24,36].map(m=>(
+            <button key={m} onClick={()=>setPm(m)} style={{background:pm===m?V.re:V.s2,border:`1px solid ${pm===m?V.re:V.bo2}`,color:V.tx,padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:12,fontWeight:500}}>{m}m</button>
+          ))}
+        </div>
+        {liquidadoEn&&<div style={{background:'#0D2D1A',border:`1px solid ${V.gr}`,borderRadius:10,padding:'12px 16px',marginBottom:14}}>
+          <div style={{fontSize:14,fontWeight:600,color:V.gr}}>🎉 Deuda $0 en el mes {liquidadoEn} ({proy[liquidadoEn-1]?.fecha})</div>
+          <div style={{fontSize:12,color:V.mu,marginTop:4}}>A partir de ahí, {fmx(pagosMen+Math.max(0,flujo))}/mes para ahorro</div>
+        </div>}
+        <div style={card}>
+          <CT c={V.bl} l={`Proyección ${pm} meses`}/>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+              <thead>
+                <tr style={{borderBottom:`1px solid ${V.bo}`}}>
+                  {['Mes','Fecha','Saldo deuda','Bono','Ahorro acum.','Estado'].map(h=>(
+                    <th key={h} style={{padding:'8px 10px',textAlign:'left',color:V.mu,fontWeight:500,fontSize:11,textTransform:'uppercase',letterSpacing:1}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {proy.map((m,i)=>(
+                  <tr key={i} style={{borderBottom:`1px solid ${V.bo}`,background:m.liq?'#0D2D1A':m.bono>0?'#2D2005':'transparent'}}>
+                    <td style={{padding:'8px 10px',color:V.mu}}>{m.mes}</td>
+                    <td style={{padding:'8px 10px',color:V.tx,fontWeight:500}}>{m.fecha}</td>
+                    <td style={{padding:'8px 10px',color:m.saldo===0?V.gr:V.re,fontWeight:600}}>{fmx(m.saldo)}</td>
+                    <td style={{padding:'8px 10px',color:V.go,fontWeight:m.bono>0?600:400}}>{m.bono>0?fmx(m.bono):'—'}</td>
+                    <td style={{padding:'8px 10px',color:V.te}}>{m.ahorroAcum>0?fmx(m.ahorroAcum):'—'}</td>
+                    <td style={{padding:'8px 10px'}}>{m.liq?<span style={{color:V.gr,fontWeight:600}}>✓ Libre</span>:m.bono>0?<span style={{color:V.go}}>💰 Bono</span>:<span style={{color:V.mu}}>En curso</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function Ahorro() {
+    const potencial = pagosMen + Math.max(0,flujo);
+    const totalPct = Object.values(S.metas_ahorro).reduce((a,m)=>a+m.porcentaje,0);
+    return (
+      <div>
+        <div style={{background:'#1A1A2A',border:`1px solid ${V.bo}`,borderRadius:10,padding:'12px 16px',marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:600,color:V.mu}}>⏳ Plan de ahorro se activa al liquidar todas las deudas</div>
+          <div style={{fontSize:12,color:V.mu,marginTop:3}}>Potencial mensual post-deudas: <b style={{color:V.go}}>{fmx(potencial)}</b></div>
+        </div>
+        <div style={card}>
+          <CT c={V.te} l="Distribución del ahorro"/>
+          <div style={{fontSize:11,color:V.mu,marginBottom:12}}>Los porcentajes deben sumar 100%</div>
+          {Object.entries(S.metas_ahorro).map(([k,m])=>{
+            const monto = potencial*(m.porcentaje/100);
+            return (
+              <div key={k} style={{padding:'12px 0',borderBottom:`1px solid ${V.bo}`}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <input type="checkbox" checked={m.activa} onChange={e=>upd(s=>{s.metas_ahorro[k].activa=e.target.checked;})} style={{width:15,height:15}}/>
+                    <span style={{fontSize:13,fontWeight:500}}>{m.nombre}</span>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <input type="number" value={m.porcentaje} min="0" max="100" onChange={e=>upd(s=>{s.metas_ahorro[k].porcentaje=parseInt(e.target.value)||0;})} style={{...inpN,width:60}}/>
+                    <span style={{fontSize:11,color:V.mu}}>%</span>
+                  </div>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:V.mu,marginBottom:4}}>
+                  <span>~{fmx(monto)}/mes</span>
+                  <span>~{fmx(monto*12)}/año</span>
+                </div>
+                <PB p={m.porcentaje} c={V.te}/>
+              </div>
+            );
+          })}
+          <div style={{marginTop:10,display:'flex',justifyContent:'space-between'}}>
+            <span style={{fontSize:13,color:V.mu}}>Total %:</span>
+            <span style={{fontSize:13,fontWeight:600,color:totalPct===100?V.gr:V.re}}>{totalPct}%</span>
+          </div>
+        </div>
+        <div style={card}>
+          <CT c={V.pu} l="Proyección de ahorro post-deudas"/>
+          {[3,6,12,24,36].map(m=>(
+            <div key={m} style={{display:'flex',justifyContent:'space-between',padding:'9px 0',borderBottom:`1px solid ${V.bo}`}}>
+              <span style={{fontSize:13,color:V.mu}}>{m} meses</span>
+              <span style={{fontSize:13,fontWeight:600,color:V.te}}>{fmx(potencial*m)}</span>
+            </div>
+          ))}
+          <div style={{marginTop:10,padding:'10px 12px',background:V.s3,borderRadius:8}}>
+            <div style={{fontSize:11,color:V.mu}}>Para enganche depto ($400k MXN):</div>
+            <div style={{fontSize:14,color:V.go,fontWeight:600,marginTop:3}}>~{Math.ceil(400000/potencial)} meses ahorrando {fmx(potencial)}/mes</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{background:V.bg,minHeight:'100vh',color:V.tx,fontFamily:'system-ui,sans-serif'}}>
+      <div style={{background:V.s1,borderBottom:`1px solid ${V.bo}`,padding:'0 12px',display:'flex',alignItems:'center',gap:2,flexWrap:'wrap',position:'sticky',top:0,zIndex:100}}>
+        <div style={{fontSize:14,letterSpacing:3,color:V.go,padding:'12px 10px 12px 0',borderRight:`1px solid ${V.bo}`,marginRight:6,fontWeight:700}}>💰 PJ</div>
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{background:'none',border:'none',color:tab===t.id?V.tx:V.mu,fontSize:11,padding:'13px 8px',cursor:'pointer',borderBottom:`3px solid ${tab===t.id?V.go:'transparent'}`,fontWeight:tab===t.id?600:400,letterSpacing:.3,textTransform:'uppercase',whiteSpace:'nowrap'}}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+      <div style={{padding:14,maxWidth:1000,margin:'0 auto'}}>
+        {tab==='resumen'&&<Resumen/>}
+        {tab==='quincena'&&<Quincena/>}
+        {tab==='deudas'&&<Deudas/>}
+        {tab==='gastos'&&<Presupuesto/>}
+        {tab==='proyeccion'&&<Proyeccion/>}
+        {tab==='ahorro'&&<Ahorro/>}
+      </div>
+      {toast&&<div style={{position:'fixed',bottom:14,right:14,background:toast.includes('Error')?V.re:V.gr,color:'#fff',padding:'7px 14px',borderRadius:20,fontSize:13,fontWeight:500,zIndex:999,pointerEvents:'none'}}>{toast}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
