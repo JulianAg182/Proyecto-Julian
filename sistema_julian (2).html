@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proyecto Julián — Sistema</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0D0D14;color:#E8E8F0;font-family:system-ui,sans-serif;min-height:100vh;}
+input,select,textarea{color-scheme:dark;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:#1A1A2A;}
+::-webkit-scrollbar-thumb{background:#444;border-radius:3px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback} = React;
+const SK='pj4';
+
+const GS={1:{n:'Upper Body',e:['Press pecho','Remo polea','Press militar','Jalón pecho','Curl bíceps Z']},2:{n:'Calistenia',e:['Push-ups','Dominadas','Sentadilla','Zancadas','Plancha']},3:{n:'Descanso',e:[]},4:{n:'Leg Day ★',e:['Prensa','Ext. cuádriceps','Curl femoral','Elev. talones','Zancada']},5:{n:'HIIT',e:['Burpees','Squat jump','Mountain climbers','Jumping jacks','Plancha baja']},6:{n:'Leg Day ★',e:['Prensa','Ext. cuádriceps','Curl femoral','Elev. talones','Zancada']},0:{n:'Descanso',e:[]}};
+const AW=[{k:'upper',n:'Upper Body',e:['Press pecho','Remo polea','Press militar','Jalón pecho','Curl bíceps Z']},{k:'calistenia',n:'Calistenia',e:['Push-ups','Dominadas','Sentadilla','Zancadas','Plancha']},{k:'leg',n:'Leg Day',e:['Prensa','Ext. cuádriceps','Curl femoral','Elev. talones','Zancada']},{k:'hiit',n:'HIIT',e:['Burpees','Squat jump','Mountain climbers','Jumping jacks','Plancha baja']},{k:'rest',n:'Descanso',e:[]}];
+const HABITS=[{k:'draw',l:'Dibujo',c:'#9B59B6'},{k:'gym',l:'Gym',c:'#E67E22'},{k:'sleep',l:'Sueño 11pm',c:'#4A90D9'},{k:'alarm',l:'Alarma 6:30',c:'#1ABC9C'},{k:'creatine',l:'Creatina',c:'#2ECC71'},{k:'nophone',l:'Sin cel',c:'#E94560'}];
+const DAYS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const MONTHS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const DEUDAS_INIT={
+  nubank:{nombre:'Nubank',saldoInicial:25990,saldo:25990,pagos:[],color:'#E94560',prioridad:1},
+  banamex:{nombre:'Banamex',saldoInicial:38000,saldo:38000,pagos:[],color:'#E67E22',prioridad:2},
+  prestamo1:{nombre:'Préstamo 1',saldoInicial:7308,saldo:7308,pagos:[],color:'#F0C040',prioridad:3},
+  bbva:{nombre:'BBVA',saldoInicial:28885,saldo:28885,pagos:[],color:'#4A90D9',prioridad:4},
+  prestamo2:{nombre:'Préstamo 2',saldoInicial:83157,saldo:83157,pagos:[],color:'#9B59B6',prioridad:5},
+};
+const REVISIONES=[
+  {fecha:'2026-03-29',titulo:'Revisión Mensual #1',tipo:'mensual',desc:'Baseline del sistema',checklist:['¿Dibujé 7/7 días?','¿Completé 5 días de gym?','¿Dormí antes de 11pm la mayoría de días?','¿Tomé creatina todos los días?','¿Pagué mínimos de deuda?','¿Qué salió bien?','¿Qué ajustar?']},
+  {fecha:'2026-04-26',titulo:'Revisión Mensual #2',tipo:'mensual',desc:'Post bono — ¿se ejecutó el plan?',checklist:['¿Llegó el bono?','¿Se liquidaron las 3 deudas prioritarias?','¿Mejoró el flujo mensual?','¿Progreso en arte?','¿Consistencia en gym?']},
+  {fecha:'2026-05-31',titulo:'Revisión Mensual #3',tipo:'mensual',desc:'InBody + revisión de arte',checklist:['¿Hice InBody este mes?','¿Bajó % de grasa?','¿Completé el plan de manos?','¿Cuántas sesiones de dibujo?','¿Progreso en deuda restante?']},
+  {fecha:'2026-06-28',titulo:'Revisión Trimestral Q2',tipo:'trimestral',desc:'Finanzas, físico y arte — 3 meses',checklist:['¿Estado de todas las deudas?','¿% grasa vs meta 18%?','¿Portfolio de arte avanzó?','¿Hábitos consistentes?','¿Ajustar metas Q3?']},
+  {fecha:'2026-07-26',titulo:'Revisión Mensual #5',tipo:'mensual',desc:'Revisión de carrera',checklist:['¿Cómo me siento en el trabajo?','¿Progreso suficiente en arte?','¿Fijar fecha de transición?','¿Estado financiero para cambio?']},
+  {fecha:'2026-08-30',titulo:'Revisión Semestral',tipo:'trimestral',desc:'6 meses — ajuste segundo semestre',checklist:['¿Cumplí metas del primer semestre?','¿Qué cambiar para H2?','¿Portfolio listo para mostrar?','¿Deuda en qué nivel?','¿Bienestar general?']},
+  {fecha:'2026-09-27',titulo:'Revisión Trimestral Q3',tipo:'trimestral',desc:'Ajuste de metas anuales',checklist:['¿On track para metas 2026?','¿Ajustar plan de arte?','¿Situación financiera?','¿Salud y gym?']},
+  {fecha:'2026-12-27',titulo:'Revisión Anual 2026',tipo:'anual',desc:'Cierre del año — planificación 2027',checklist:['¿Logré liquidar 3 deudas con bono?','¿Avancé en el plan de arte?','¿Portfolio publicado?','¿Cambio de carrera más cercano?','¿Metas para 2027?','¿Bienestar personal?']},
+];
+const E0={habits:{},gym:{},draw:{},deudas:null,revisiones_notas:{},revisiones_checks:{}};
+
+function dk(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function today(){return dk(new Date());}
+function weekDays(off=0){const t=new Date(),dow=t.getDay(),m=new Date(t);m.setDate(t.getDate()-(dow===0?6:dow-1)+off*7);return Array.from({length:7},(_,i)=>{const d=new Date(m);d.setDate(m.getDate()+i);return d;});}
+function monthDays(y,mo){const a=[],d=new Date(y,mo,1);while(d.getMonth()===mo){a.push(new Date(d));d.setDate(d.getDate()+1);}return a;}
+function fmx(n){return '$'+Math.round(n||0).toLocaleString('es-MX');}
+
+function App(){
+  const [tab,setTab]=useState('dash');
+  const [S,setS]=useState(null);
+  const [view,setView]=useState('week');
+  const [wOff,setWOff]=useState(0);
+  const [mn,setMn]=useState({y:new Date().getFullYear(),m:new Date().getMonth()});
+  const [toast,setToast]=useState('');
+
+  useEffect(()=>{
+    try{
+      const r=localStorage.getItem(SK);
+      if(r){const p=JSON.parse(r);if(!p.deudas)p.deudas=JSON.parse(JSON.stringify(DEUDAS_INIT));if(!p.revisiones_notas)p.revisiones_notas={};if(!p.revisiones_checks)p.revisiones_checks={};setS(p);}
+      else{const n=JSON.parse(JSON.stringify(E0));n.deudas=JSON.parse(JSON.stringify(DEUDAS_INIT));setS(n);}
+    }catch{const n=JSON.parse(JSON.stringify(E0));n.deudas=JSON.parse(JSON.stringify(DEUDAS_INIT));setS(n);}
+  },[]);
+
+  const save=useCallback((ns)=>{try{localStorage.setItem(SK,JSON.stringify(ns));setToast('✓ Guardado');setTimeout(()=>setToast(''),1200);}catch{setToast('Error');setTimeout(()=>setToast(''),2000);}},[]);
+  const upd=useCallback((fn)=>{setS(p=>{const n=JSON.parse(JSON.stringify(p));fn(n);save(n);return n;});},[save]);
+
+  if(!S)return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'#7070A0'}}>Cargando...</div>;
+
+  const V={bg:'#0D0D14',s1:'#13131E',s2:'#1A1A2A',s3:'#22223A',bo:'rgba(255,255,255,0.08)',bo2:'rgba(255,255,255,0.15)',tx:'#E8E8F0',mu:'#7070A0',re:'#E94560',or:'#E67E22',bl:'#4A90D9',gr:'#2ECC71',pu:'#9B59B6',go:'#F0C040',te:'#1ABC9C'};
+  const card={background:V.s1,border:`1px solid ${V.bo}`,borderRadius:12,padding:16,marginBottom:12};
+  const inp={background:V.s2,border:`1px solid ${V.bo2}`,borderRadius:6,color:V.tx,fontFamily:'inherit',fontSize:13,padding:'7px 10px',width:'100%',boxSizing:'border-box',outline:'none'};
+
+  const getH=(d,k)=>(S.habits[d]||{})[k]||false;
+  const togH=(d,k)=>upd(s=>{if(!s.habits[d])s.habits[d]={};s.habits[d][k]=!s.habits[d][k];});
+  const score=(d)=>{const done=HABITS.filter(h=>getH(d,h.k)).length;return{done,pct:Math.round(done/HABITS.length*100)};};
+  function getStats(days){const t={};HABITS.forEach(h=>t[h.k]=0);days.forEach(d=>{const d2=dk(d);HABITS.forEach(h=>{if(getH(d2,h.k))t[h.k]++;});});return t;}
+  function calcStreak(hk){let s=0;const d=new Date();while(true){const d2=dk(d);if(!getH(d2,hk))break;s++;d.setDate(d.getDate()-1);}return s;}
+
+  const PB=({p,c,h=6})=><div style={{background:V.s3,borderRadius:3,height:h,overflow:'hidden'}}><div style={{height:'100%',borderRadius:3,width:`${Math.min(100,Math.max(0,p||0))}%`,background:c,transition:'width .3s'}}/></div>;
+
+  function BarChart({data,color,height=65}){
+    const max=Math.max(...data.map(d=>d.v),1);
+    return <div style={{display:'flex',alignItems:'flex-end',gap:2,height:height+18}}>
+      {data.map((d,i)=>(
+        <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+          <div style={{width:'100%',height:height,display:'flex',alignItems:'flex-end',position:'relative'}}>
+            <div style={{width:'100%',background:d.v>0?color:V.s3,borderRadius:'3px 3px 0 0',height:`${Math.max((d.v/max)*100,d.v>0?6:0)}%`,transition:'height .4s'}}/>
+            {d.v>0&&<div style={{position:'absolute',top:-13,width:'100%',textAlign:'center',fontSize:9,color}}>{d.v}</div>}
+          </div>
+          <div style={{fontSize:8,color:V.mu,textAlign:'center',width:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.l}</div>
+        </div>
+      ))}
+    </div>;
+  }
+
+  function RingChart({pct,color,size=68,stroke=7,value,label}){
+    const r=(size-stroke)/2,circ=2*Math.PI*r,off=circ*(1-(pct||0)/100);
+    return <div style={{position:'relative',width:size,height:size,flexShrink:0}}>
+      <svg width={size} height={size} style={{transform:'rotate(-90deg)'}}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={V.s3} strokeWidth={stroke}/>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round" style={{transition:'stroke-dashoffset .5s'}}/>
+      </svg>
+      <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+        <div style={{fontSize:14,fontWeight:700,color,lineHeight:1}}>{value}</div>
+        {label&&<div style={{fontSize:8,color:V.mu,marginTop:1,textAlign:'center',maxWidth:48}}>{label}</div>}
+      </div>
+    </div>;
+  }
+
+  // ── DASHBOARD ──
+  function Dash(){
+    const t=new Date(),tk=today(),plan=GS[t.getDay()];
+    const wd=weekDays(wOff),ws=getStats(wd);
+    const md=monthDays(mn.y,mn.m),ms=getStats(md);
+    const qS=Math.floor(t.getMonth()/3)*3,qd=[];
+    for(let i=qS;i<qS+3;i++)monthDays(t.getFullYear(),i).forEach(d=>qd.push(d));
+    const qs=getStats(qd);
+    const vm={week:{s:ws,max:7},month:{s:ms,max:md.length},quarter:{s:qs,max:qd.length}};
+    const cur=vm[view]||vm.week;
+    const sc=score(tk);
+    const l12w=Array.from({length:12},(_,i)=>weekDays(-11+i));
+    const wDrawData=l12w.map((wk2,i)=>({v:wk2.filter(d=>getH(dk(d),'draw')).length,l:i%4===0?`${wk2[0].getDate()}/${wk2[0].getMonth()+1}`:''}));
+    const wGymData=l12w.map((wk2,i)=>({v:wk2.filter(d=>getH(dk(d),'gym')).length,l:i%4===0?`${wk2[0].getDate()}/${wk2[0].getMonth()+1}`:''}));
+    const wScores=l12w.map(wk2=>{const st=getStats(wk2);const sl=wk2.filter(d=>getH(dk(d),'sleep')).length,al=wk2.filter(d=>getH(dk(d),'alarm')).length;return Math.round((st.draw/7*35)+(st.gym/7*35)+(sl/7*20)+(al/7*10));});
+    const drawStreak=calcStreak('draw'),gymStreak=calcStreak('gym'),sleepStreak=calcStreak('sleep');
+    const allDL=Object.values(S.draw),totalDS=allDL.filter(l=>l.done).length,totalDM=allDL.reduce((a,l)=>a+(l.mins||0),0);
+    const mD=allDL.filter(l=>l.done&&l.timeofday==='morning').length,nD=allDL.filter(l=>l.done&&l.timeofday==='night').length;
+    const deudas=S.deudas||DEUDAS_INIT;
+    const totalDeuda=Object.values(deudas).reduce((a,d)=>a+d.saldo,0);
+    const deudaPct=Math.max(0,Math.round((183340-totalDeuda)/183340*100));
+    const hoy=new Date(),proxRev=REVISIONES.find(r=>new Date(r.fecha)>=hoy);
+    const diasRev=proxRev?Math.ceil((new Date(proxRev.fecha)-hoy)/(1000*60*60*24)):null;
+
+    return <div>
+      {/* CHECK-IN */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <span style={{fontWeight:600,fontSize:14}}>Check-in de hoy</span>
+          <span style={{fontSize:11,color:V.mu}}>{t.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}</span>
+        </div>
+        <div style={{background:V.s2,borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div><div style={{fontSize:10,color:V.mu}}>Plan de hoy</div><div style={{fontSize:13,fontWeight:600,color:plan.e.length?V.or:V.mu}}>{plan.n}</div></div>
+          <div style={{textAlign:'right'}}><div style={{fontSize:10,color:V.mu}}>Score hoy</div><div style={{fontSize:22,fontWeight:700,color:sc.pct>=80?V.gr:sc.pct>=50?V.go:V.mu}}>{sc.pct}%</div></div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
+          {HABITS.map(hb=>{const done=getH(tk,hb.k);return(
+            <div key={hb.k} onClick={()=>togH(tk,hb.k)} style={{background:done?hb.c+'22':V.s2,border:`1px solid ${done?hb.c:V.bo}`,borderRadius:8,padding:'9px 5px',textAlign:'center',cursor:'pointer',userSelect:'none',transition:'all .15s'}}>
+              <div style={{fontSize:10,color:done?hb.c:V.mu,fontWeight:600,marginBottom:2}}>{hb.l}</div>
+              <div style={{fontSize:17,color:done?hb.c:V.s3}}>{done?'✓':'○'}</div>
+            </div>
+          );})}
+        </div>
+        <div style={{marginTop:8}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:V.mu,marginBottom:3}}><span>Hoy</span><span style={{color:V.tx,fontWeight:600}}>{sc.done}/{HABITS.length}</span></div>
+          <PB p={sc.pct} c={sc.pct>=80?V.gr:sc.pct>=50?V.go:V.re} h={7}/>
+        </div>
+      </div>
+
+      {/* RACHAS */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:12}}>
+        {[{v:drawStreak,l:'Racha dibujo',c:V.pu},{v:gymStreak,l:'Racha gym',c:V.or},{v:sleepStreak,l:'Racha sueño',c:V.bl}].map(({v,l,c})=>(
+          <div key={l} style={{...card,marginBottom:0,textAlign:'center',padding:'12px 6px'}}>
+            <div style={{fontSize:10,color:V.mu,marginBottom:3}}>{l}</div>
+            <div style={{fontSize:26,fontWeight:700,color:c,lineHeight:1}}>{v}</div>
+            <div style={{fontSize:9,color:V.mu}}>días</div>
+          </div>
+        ))}
+      </div>
+
+      {/* SCORE 12 SEMANAS */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <span style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase'}}>Score semanal — 12 semanas</span>
+          <span style={{fontSize:14,fontWeight:700,color:V.go}}>{wScores[wScores.length-1]} pts</span>
+        </div>
+        <BarChart data={wScores.map((v,i)=>({v,l:i%4===0?`${l12w[i][0].getDate()}/${l12w[i][0].getMonth()+1}`:''}))} color={V.go} height={70}/>
+      </div>
+
+      {/* DIBUJO + GYM CHARTS */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+        <div style={card}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+            <span style={{fontSize:10,color:V.mu,textTransform:'uppercase',letterSpacing:1}}>Dibujo 12 sem</span>
+            <span style={{fontSize:11,fontWeight:600,color:V.pu}}>{totalDS} ses.</span>
+          </div>
+          <BarChart data={wDrawData} color={V.pu} height={55}/>
+          <div style={{marginTop:6,display:'flex',justifyContent:'space-between',fontSize:9,color:V.mu}}>
+            <span>🌅 {mD}</span><span>🌙 {nD}</span><span>⏱ {Math.round(totalDM/60)}h</span>
+          </div>
+        </div>
+        <div style={card}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+            <span style={{fontSize:10,color:V.mu,textTransform:'uppercase',letterSpacing:1}}>Gym 12 sem</span>
+            <span style={{fontSize:11,fontWeight:600,color:V.or}}>{Object.values(S.gym).filter(g=>g.done).length} ses.</span>
+          </div>
+          <BarChart data={wGymData} color={V.or} height={55}/>
+        </div>
+      </div>
+
+      {/* ANILLOS */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <span style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase'}}>Cumplimiento de hábitos</span>
+          <div style={{display:'flex',gap:5}}>
+            {['week','month','quarter'].map(v=><button key={v} onClick={()=>setView(v)} style={{background:view===v?V.re:V.s2,border:`1px solid ${view===v?V.re:V.bo2}`,color:V.tx,padding:'3px 9px',borderRadius:5,cursor:'pointer',fontSize:10}}>{v==='week'?'Sem':v==='month'?'Mes':'Trim'}</button>)}
+          </div>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-around',flexWrap:'wrap',gap:6}}>
+          {HABITS.map(hb=>{const done=cur.s[hb.k]||0,pct=Math.round(done/cur.max*100);return(
+            <div key={hb.k} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+              <RingChart pct={pct} color={hb.c} value={`${pct}%`} label={hb.l}/>
+              <div style={{fontSize:9,color:V.mu}}>{done}/{cur.max}</div>
+            </div>
+          );})}
+        </div>
+      </div>
+
+      {/* TABLA SEMANAL */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:6}}>
+          <span style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase'}}>Semana</span>
+          <div style={{display:'flex',gap:5,alignItems:'center'}}>
+            <button onClick={()=>setWOff(p=>p-1)} style={{background:V.s2,border:`1px solid ${V.bo2}`,color:V.tx,padding:'3px 8px',borderRadius:5,cursor:'pointer',fontSize:11}}>←</button>
+            <span style={{fontSize:10,color:V.mu}}>{weekDays(wOff)[0].getDate()} {MONTHS[weekDays(wOff)[0].getMonth()]} – {weekDays(wOff)[6].getDate()} {MONTHS[weekDays(wOff)[6].getMonth()]}</span>
+            <button onClick={()=>setWOff(p=>p+1)} style={{background:V.s2,border:`1px solid ${V.bo2}`,color:V.tx,padding:'3px 8px',borderRadius:5,cursor:'pointer',fontSize:11}}>→</button>
+            <button onClick={()=>setWOff(0)} style={{background:V.re,border:`1px solid ${V.re}`,color:'#fff',padding:'3px 8px',borderRadius:5,cursor:'pointer',fontSize:10}}>Hoy</button>
+          </div>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+            <thead><tr>
+              <th style={{padding:'5px 6px',textAlign:'left',color:V.mu,fontWeight:500,fontSize:10}}>Hábito</th>
+              {wd.map((d,i)=>{const isT=dk(d)===today();return <th key={i} style={{padding:'4px 3px',textAlign:'center',color:isT?V.re:V.mu,fontWeight:isT?700:500,fontSize:10}}><div>{DAYS[d.getDay()]}</div><div style={{fontSize:9}}>{d.getDate()}</div></th>;})}
+              <th style={{padding:'4px 6px',textAlign:'center',color:V.mu,fontSize:10}}>%</th>
+            </tr></thead>
+            <tbody>{HABITS.map(hb=>(
+              <tr key={hb.k} style={{borderTop:`1px solid ${V.bo}`}}>
+                <td style={{padding:'6px',color:V.tx,fontSize:11}}>{hb.l}</td>
+                {wd.map((d,i)=>{const d2=dk(d),done=getH(d2,hb.k),isT=d2===today();return(
+                  <td key={i} onClick={()=>togH(d2,hb.k)} style={{padding:'6px 3px',textAlign:'center',cursor:'pointer'}}>
+                    <div style={{width:21,height:21,borderRadius:5,background:done?hb.c:V.s2,border:`1px solid ${done?hb.c:isT?hb.c+'55':V.bo}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:done?'#fff':V.mu,margin:'0 auto'}}>{done?'✓':''}</div>
+                  </td>
+                );})}
+                <td style={{padding:'6px',textAlign:'center',color:hb.c,fontWeight:600,fontSize:11}}>{Math.round(ws[hb.k]/7*100)}%</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* DEUDA MINI */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <span style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase'}}>Estado de deuda</span>
+          <button onClick={()=>setTab('deuda')} style={{background:'transparent',border:'none',color:V.te,cursor:'pointer',fontSize:11}}>Detalle →</button>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+          <RingChart pct={deudaPct} color={V.gr} value={`${deudaPct}%`} label="Eliminado" size={64} stroke={7}/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:20,fontWeight:700,color:V.re,marginBottom:3}}>{fmx(totalDeuda)}</div>
+            <div style={{fontSize:10,color:V.mu,marginBottom:5}}>Deuda total restante</div>
+            <PB p={deudaPct} c={V.gr} h={8}/>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {Object.entries(deudas).map(([k,d])=>(
+            <div key={k} style={{flex:1,minWidth:70,background:V.s2,borderRadius:6,padding:'6px 7px'}}>
+              <div style={{fontSize:9,color:V.mu,marginBottom:1}}>{d.nombre}</div>
+              <div style={{fontSize:12,fontWeight:600,color:d.saldo===0?V.gr:d.color}}>{fmx(d.saldo)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* PRÓXIMA REVISIÓN */}
+      {proxRev&&<div style={{...card,border:`1px solid ${diasRev<=7?V.re:diasRev<=30?V.go:V.bo}`}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+          <span style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase'}}>Próxima revisión</span>
+          <button onClick={()=>setTab('revisiones')} style={{background:'transparent',border:'none',color:V.te,cursor:'pointer',fontSize:11}}>Ver todas →</button>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div><div style={{fontSize:13,fontWeight:600,color:diasRev<=7?V.re:V.tx}}>{proxRev.titulo}</div><div style={{fontSize:11,color:V.mu,marginTop:2}}>{proxRev.desc}</div></div>
+          <div style={{textAlign:'right',flexShrink:0,marginLeft:10}}><div style={{fontSize:24,fontWeight:700,color:diasRev<=7?V.re:diasRev<=30?V.go:V.bl}}>{diasRev}</div><div style={{fontSize:9,color:V.mu}}>días</div></div>
+        </div>
+      </div>}
+    </div>;
+  }
+
+  // ── GYM ──
+  function GymTab(){
+    const t=new Date(),tk=today(),plan=GS[t.getDay()];
+    const log=S.gym[tk]||{};
+    const selK=log.type||AW.find(w=>w.n===plan.n)?.k||'upper';
+    const wk=AW.find(w=>w.k===selK)||AW[0];
+    const sets=log.sets||{};
+    return <div>
+      <div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Entrenamiento de hoy</div>
+        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,flexWrap:'wrap'}}>
+          <div style={{background:V.s2,borderRadius:7,padding:'7px 11px'}}>
+            <div style={{fontSize:10,color:V.mu}}>Plan de hoy</div>
+            <div style={{fontSize:13,fontWeight:600,color:V.or}}>{plan.n}</div>
+          </div>
+          <span style={{color:V.mu}}>→</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:10,color:V.mu,marginBottom:4}}>¿Qué hiciste?</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+              {AW.map(w=><button key={w.k} onClick={()=>upd(s=>{if(!s.gym[tk])s.gym[tk]={};s.gym[tk].type=w.k;})} style={{background:selK===w.k?V.or:V.s2,border:`1px solid ${selK===w.k?V.or:V.bo2}`,color:V.tx,padding:'4px 8px',borderRadius:5,cursor:'pointer',fontSize:11}}>{w.n}</button>)}
+            </div>
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+          <div onClick={()=>upd(s=>{if(!s.gym[tk])s.gym[tk]={};s.gym[tk].done=!s.gym[tk].done;if(!s.habits[tk])s.habits[tk]={};s.habits[tk].gym=!!s.gym[tk].done;})}
+            style={{width:26,height:26,borderRadius:6,background:log.done?V.gr:V.s2,border:`1px solid ${log.done?V.gr:V.bo2}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'#fff',fontSize:14}}>
+            {log.done?'✓':''}
+          </div>
+          <span style={{fontSize:12,color:log.done?V.gr:V.mu}}>Entrenamiento completado</span>
+        </div>
+        {wk.e.length>0&&<>
+          <div style={{fontSize:10,color:V.mu,textTransform:'uppercase',letterSpacing:1,marginBottom:7}}>Pesos por serie (kg)</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 46px 46px 46px 46px',gap:4,fontSize:10,color:V.mu,paddingBottom:5,borderBottom:`1px solid ${V.bo}`}}>
+            <div>Ejercicio</div>{['S1','S2','S3','S4'].map(s=><div key={s} style={{textAlign:'center'}}>{s}</div>)}
+          </div>
+          {wk.e.map((ex,ei)=>{const exS=(sets[ex]||[]);return(
+            <div key={ei} style={{display:'grid',gridTemplateColumns:'1fr 46px 46px 46px 46px',gap:4,alignItems:'center',padding:'5px 0',borderBottom:`1px solid ${V.bo}`}}>
+              <div style={{fontSize:11}}>{ex}</div>
+              {[0,1,2,3].map(si=><input key={si} type="number" placeholder="—" defaultValue={exS[si]||''} onBlur={e=>{const v=e.target.value?parseFloat(e.target.value):null;upd(s=>{if(!s.gym[tk])s.gym[tk]={};if(!s.gym[tk].sets)s.gym[tk].sets={};if(!s.gym[tk].sets[ex])s.gym[tk].sets[ex]=[];s.gym[tk].sets[ex][si]=v;});}} style={{background:V.s3,border:`1px solid ${V.bo2}`,borderRadius:3,color:V.tx,fontSize:11,textAlign:'center',padding:3,width:'100%',outline:'none'}}/>)}
+            </div>
+          );})}
+        </>}
+        <div style={{marginTop:10}}>
+          <div style={{fontSize:10,color:V.mu,marginBottom:3}}>Notas</div>
+          <textarea style={{...inp,minHeight:48,resize:'vertical'}} value={log.notes||''} onChange={e=>upd(s=>{if(!s.gym[tk])s.gym[tk]={};s.gym[tk].notes=e.target.value;})} placeholder="¿Cómo estuvo?"/>
+        </div>
+      </div>
+      <div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Últimas 7 sesiones</div>
+        {Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-i);const d2=dk(d),gl=S.gym[d2]||{},wt=AW.find(w=>w.k===gl.type);
+          return <div key={d2} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${V.bo}`}}>
+            <div><div style={{fontSize:12,fontWeight:500}}>{DAYS[d.getDay()]} {d.getDate()}/{d.getMonth()+1}</div><div style={{fontSize:10,color:V.mu}}>{wt?wt.n:GS[d.getDay()].n+' (plan)'}</div></div>
+            {gl.done?<span style={{fontSize:10,background:V.gr+'22',color:V.gr,padding:'2px 7px',borderRadius:4}}>✓ Hecho</span>:<span style={{fontSize:10,color:V.mu}}>—</span>}
+          </div>;
+        })}
+      </div>
+    </div>;
+  }
+
+  // ── DIBUJO ──
+  function DrawTab(){
+    const tk=today(),log=S.draw[tk]||{};
+    const FOCUS=['Gesture / movimiento','Figura humana','Manos','Caras / expresiones','Anatomía','Perspectiva','Personaje propio','Copia de maestros','Libre'];
+    const allL=Object.values(S.draw),ts=allL.filter(l=>l.done).length,tm=allL.reduce((a,l)=>a+(l.mins||0),0);
+    let streak=0;{const d=new Date();while(true){const d2=dk(d);if(!(S.draw[d2]&&S.draw[d2].done))break;streak++;d.setDate(d.getDate()-1);}}
+    const mD=allL.filter(l=>l.done&&l.timeofday==='morning').length,nD=allL.filter(l=>l.done&&l.timeofday==='night').length;
+    return <div>
+      <div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Sesión de hoy</div>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+          <div onClick={()=>upd(s=>{if(!s.draw[tk])s.draw[tk]={};s.draw[tk].done=!s.draw[tk].done;if(!s.habits[tk])s.habits[tk]={};s.habits[tk].draw=!!s.draw[tk].done;})}
+            style={{width:26,height:26,borderRadius:6,background:log.done?V.pu:V.s2,border:`1px solid ${log.done?V.pu:V.bo2}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'#fff',fontSize:14}}>
+            {log.done?'✓':''}
+          </div>
+          <span style={{fontSize:12,color:log.done?V.pu:V.mu}}>Sesión completada hoy</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+          <div><div style={{fontSize:10,color:V.mu,marginBottom:3}}>Tiempo (min)</div>
+            <input style={inp} type="number" placeholder="30" value={log.mins||''} onChange={e=>upd(s=>{if(!s.draw[tk])s.draw[tk]={};s.draw[tk].mins=parseInt(e.target.value)||0;})}/>
+          </div>
+          <div><div style={{fontSize:10,color:V.mu,marginBottom:3}}>Enfoque</div>
+            <select style={inp} value={log.focus||''} onChange={e=>upd(s=>{if(!s.draw[tk])s.draw[tk]={};s.draw[tk].focus=e.target.value;})}>
+              <option value="">Seleccionar...</option>
+              {FOCUS.map(f=><option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{marginBottom:8}}>
+          <div style={{fontSize:10,color:V.mu,marginBottom:5}}>¿Cuándo dibujaste?</div>
+          <div style={{display:'flex',gap:7}}>
+            {[{v:'morning',l:'🌅 Mañana',c:V.go},{v:'night',l:'🌙 Noche',c:V.bl}].map(opt=>(
+              <div key={opt.v} onClick={()=>upd(s=>{if(!s.draw[tk])s.draw[tk]={};s.draw[tk].timeofday=opt.v;})}
+                style={{flex:1,background:log.timeofday===opt.v?opt.c+'33':V.s2,border:`1px solid ${log.timeofday===opt.v?opt.c:V.bo2}`,borderRadius:7,padding:'8px',cursor:'pointer',textAlign:'center',fontSize:12,color:log.timeofday===opt.v?opt.c:V.mu,fontWeight:log.timeofday===opt.v?600:400,transition:'all .15s'}}>
+                {opt.l}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{marginBottom:8}}>
+          <div style={{fontSize:10,color:V.mu,marginBottom:3}}>Notas</div>
+          <textarea style={{...inp,minHeight:55,resize:'vertical'}} value={log.notes||''} onChange={e=>upd(s=>{if(!s.draw[tk])s.draw[tk]={};s.draw[tk].notes=e.target.value;})} placeholder="¿Qué estudié? ¿Qué mejoró?"/>
+        </div>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+          {['Difícil','Normal','Bien','Excelente'].map(f=><div key={f} onClick={()=>upd(s=>{if(!s.draw[tk])s.draw[tk]={};s.draw[tk].feeling=f;})} style={{background:log.feeling===f?V.pu+'33':V.s2,border:`1px solid ${log.feeling===f?V.pu:V.bo2}`,borderRadius:6,padding:'5px 8px',cursor:'pointer',fontSize:11,color:log.feeling===f?V.pu:V.mu}}>{f}</div>)}
+        </div>
+      </div>
+      <div style={card}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:7}}>
+          {[{v:ts,l:'Sesiones',c:V.pu},{v:`${Math.round(tm/60)}h`,l:'Horas',c:V.pu},{v:streak,l:'Racha',c:V.go},{v:`${mD}/${nD}`,l:'Mañ/Noche',c:V.bl}].map(({v,l,c})=>(
+            <div key={l} style={{background:V.s2,borderRadius:8,padding:'9px 5px',textAlign:'center'}}>
+              <div style={{fontSize:19,fontWeight:700,color:c,lineHeight:1,marginBottom:2}}>{v}</div>
+              <div style={{fontSize:9,color:V.mu,textTransform:'uppercase',letterSpacing:.3}}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Últimas 7 sesiones</div>
+        {Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-i);const d2=dk(d),dl=S.draw[d2]||{};
+          return <div key={d2} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${V.bo}`}}>
+            <div><div style={{fontSize:12,fontWeight:500}}>{DAYS[d.getDay()]} {d.getDate()}/{d.getMonth()+1}</div>
+              <div style={{fontSize:10,color:V.mu}}>{dl.focus||'—'}{dl.mins?` · ${dl.mins}min`:''}{dl.timeofday?` · ${dl.timeofday==='morning'?'🌅':'🌙'}`:''}</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:4}}>
+              {dl.feeling&&<span style={{fontSize:10,color:V.mu}}>{dl.feeling}</span>}
+              {dl.done?<span style={{fontSize:10,background:V.pu+'22',color:V.pu,padding:'2px 6px',borderRadius:4}}>✓</span>:<span style={{fontSize:10,color:V.mu}}>{i===0?'Pend.':'—'}</span>}
+            </div>
+          </div>;
+        })}
+      </div>
+    </div>;
+  }
+
+  // ── HÁBITOS ──
+  function HabTab(){
+    const tk=today(),wd2=weekDays(0);
+    return <div>
+      <div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Hábitos de hoy</div>
+        {HABITS.map(hb=>{const done=getH(tk,hb.k);return(
+          <div key={hb.k} style={{display:'flex',alignItems:'center',gap:11,padding:'10px 0',borderBottom:`1px solid ${V.bo}`}}>
+            <div onClick={()=>togH(tk,hb.k)} style={{width:26,height:26,borderRadius:6,background:done?hb.c:V.s2,border:`1px solid ${done?hb.c:V.bo2}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'#fff',fontSize:13}}>{done?'✓':''}</div>
+            <span style={{fontSize:13,color:done?V.tx:V.mu,fontWeight:done?500:400}}>{hb.l}</span>
+            {done&&<span style={{marginLeft:'auto',fontSize:10,color:hb.c,background:hb.c+'22',padding:'2px 7px',borderRadius:4}}>✓</span>}
+          </div>
+        );})}
+      </div>
+      <div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Esta semana</div>
+        {HABITS.map(hb=>{const done=wd2.filter(d=>getH(dk(d),hb.k)).length;return(
+          <div key={hb.k} style={{marginBottom:9}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:V.mu,marginBottom:3}}><span>{hb.l}</span><span style={{color:hb.c,fontWeight:600}}>{done}/7 · {Math.round(done/7*100)}%</span></div>
+            <PB p={done/7*100} c={hb.c}/>
+          </div>
+        );})}
+      </div>
+    </div>;
+  }
+
+  // ── DEUDA ──
+  function DeudaTab(){
+    const [pagoForm,setPagoForm]=useState({deuda:'',monto:'',fecha:today(),nota:''});
+    const [editSaldo,setEditSaldo]=useState({});
+    const deudas=S.deudas||DEUDAS_INIT;
+    const totalDeuda=Object.values(deudas).reduce((a,d)=>a+d.saldo,0);
+    const totalOrig=183340,deudaPct=Math.max(0,Math.round((totalOrig-totalDeuda)/totalOrig*100));
+
+    function calcProy(){
+      const allP=[];Object.values(deudas).forEach(d=>(d.pagos||[]).forEach(p=>allP.push(p)));
+      if(allP.length<2)return null;
+      allP.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+      const first=new Date(allP[0].fecha),last=new Date(allP[allP.length-1].fecha);
+      const meses=Math.max(0.5,(last-first)/(1000*60*60*24*30));
+      const totalP=allP.reduce((a,p)=>a+p.monto,0);
+      const pm=totalP/meses;
+      if(pm<=0)return null;
+      const mr=Math.ceil(totalDeuda/pm);
+      const fe=new Date();fe.setMonth(fe.getMonth()+mr);
+      return{pm,mr,fe,totalP};
+    }
+    const proy=calcProy();
+
+    function agregarPago(){
+      if(!pagoForm.deuda||!pagoForm.monto)return;
+      upd(s=>{
+        if(!s.deudas)s.deudas=JSON.parse(JSON.stringify(DEUDAS_INIT));
+        const d=s.deudas[pagoForm.deuda];if(!d)return;
+        if(!d.pagos)d.pagos=[];
+        const m=parseFloat(pagoForm.monto)||0;
+        d.pagos.push({fecha:pagoForm.fecha,monto:m,nota:pagoForm.nota});
+        d.pagos.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+        d.saldo=Math.max(0,d.saldo-m);
+      });
+      setPagoForm({deuda:'',monto:'',fecha:today(),nota:''});
+    }
+
+    const todosPagos=[];
+    Object.entries(deudas).forEach(([k,d])=>(d.pagos||[]).forEach(p=>todosPagos.push({...p,dk:k,dn:d.nombre,color:d.color})));
+    todosPagos.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+    return <div>
+      <div style={card}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+          <RingChart pct={deudaPct} color={V.gr} value={`${deudaPct}%`} label="Eliminado" size={64} stroke={7}/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:20,fontWeight:700,color:V.re,marginBottom:3}}>{fmx(totalDeuda)}</div>
+            <div style={{fontSize:10,color:V.mu,marginBottom:5}}>de {fmx(totalOrig)} original</div>
+            <PB p={deudaPct} c={V.gr} h={9}/>
+          </div>
+        </div>
+        {proy&&<div style={{background:V.s2,borderRadius:8,padding:'10px 12px',display:'flex',gap:12,flexWrap:'wrap'}}>
+          <div><div style={{fontSize:9,color:V.mu}}>Pago promedio/mes</div><div style={{fontSize:13,fontWeight:600,color:V.te}}>{fmx(proy.pm)}</div></div>
+          <div><div style={{fontSize:9,color:V.mu}}>Meses restantes</div><div style={{fontSize:13,fontWeight:600,color:V.go}}>{proy.mr}</div></div>
+          <div><div style={{fontSize:9,color:V.mu}}>Fecha estimada $0</div><div style={{fontSize:13,fontWeight:600,color:V.pu}}>{proy.fe.toLocaleDateString('es-MX',{month:'short',year:'numeric'})}</div></div>
+          <div><div style={{fontSize:9,color:V.mu}}>Total pagado</div><div style={{fontSize:13,fontWeight:600,color:V.gr}}>{fmx(proy.totalP)}</div></div>
+        </div>}
+        {!proy&&<div style={{background:V.s2,borderRadius:7,padding:'9px 12px',fontSize:11,color:V.mu}}>Registra al menos 2 pagos para ver la proyección de liquidación.</div>}
+      </div>
+
+      <div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Saldos actuales</div>
+        {Object.entries(deudas).map(([k,d])=>{
+          const orig=d.saldoInicial||183340,pct=Math.max(0,Math.round((orig-d.saldo)/orig*100));
+          return <div key={k} style={{padding:'9px 0',borderBottom:`1px solid ${V.bo}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+              <div style={{display:'flex',alignItems:'center',gap:7}}>
+                <span style={{fontSize:12,fontWeight:500}}>{d.nombre}</span>
+                <span style={{fontSize:9,padding:'2px 6px',borderRadius:3,background:d.color+'22',color:d.color}}>P{d.prioridad}</span>
+                {d.saldo===0&&<span style={{fontSize:9,padding:'2px 6px',borderRadius:3,background:V.gr+'22',color:V.gr}}>✓ Liquidada</span>}
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                {editSaldo[k]!==undefined
+                  ?<><input type="number" value={editSaldo[k]} onChange={e=>setEditSaldo(p=>({...p,[k]:e.target.value}))} style={{...inp,width:100,padding:'4px 7px',fontSize:11}}/>
+                    <button onClick={()=>{upd(s=>{if(!s.deudas)s.deudas=JSON.parse(JSON.stringify(DEUDAS_INIT));s.deudas[k].saldo=parseFloat(editSaldo[k])||0;});setEditSaldo(p=>{const n={...p};delete n[k];return n;});}} style={{background:V.gr,border:'none',color:'#fff',padding:'4px 8px',borderRadius:4,cursor:'pointer',fontSize:10}}>✓</button>
+                    <button onClick={()=>setEditSaldo(p=>{const n={...p};delete n[k];return n;})} style={{background:V.s2,border:`1px solid ${V.bo2}`,color:V.mu,padding:'4px 8px',borderRadius:4,cursor:'pointer',fontSize:10}}>✕</button>
+                  </>
+                  :<><span style={{fontSize:14,fontWeight:700,color:d.saldo===0?V.gr:d.color}}>{fmx(d.saldo)}</span>
+                    <button onClick={()=>setEditSaldo(p=>({...p,[k]:d.saldo}))} style={{background:V.s2,border:`1px solid ${V.bo2}`,color:V.mu,padding:'3px 7px',borderRadius:4,cursor:'pointer',fontSize:10}}>Editar</button>
+                  </>}
+              </div>
+            </div>
+            <PB p={pct} c={d.color}/>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:9,color:V.mu,marginTop:2}}>
+              <span>Inicial: {fmx(orig)}</span><span>Pagado: {fmx(orig-d.saldo)} ({pct}%)</span>
+            </div>
+          </div>;
+        })}
+      </div>
+
+      <div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Registrar pago</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+          <div><div style={{fontSize:10,color:V.mu,marginBottom:3}}>Deuda</div>
+            <select style={inp} value={pagoForm.deuda} onChange={e=>setPagoForm(p=>({...p,deuda:e.target.value}))}>
+              <option value="">Seleccionar...</option>
+              {Object.entries(deudas).map(([k,d])=><option key={k} value={k}>{d.nombre}</option>)}
+            </select>
+          </div>
+          <div><div style={{fontSize:10,color:V.mu,marginBottom:3}}>Monto (MXN)</div>
+            <input style={inp} type="number" placeholder="0" value={pagoForm.monto} onChange={e=>setPagoForm(p=>({...p,monto:e.target.value}))}/>
+          </div>
+          <div><div style={{fontSize:10,color:V.mu,marginBottom:3}}>Fecha</div>
+            <input style={inp} type="date" value={pagoForm.fecha} onChange={e=>setPagoForm(p=>({...p,fecha:e.target.value}))}/>
+          </div>
+          <div><div style={{fontSize:10,color:V.mu,marginBottom:3}}>Nota (opcional)</div>
+            <input style={inp} type="text" placeholder="Pago mínimo, abono..." value={pagoForm.nota} onChange={e=>setPagoForm(p=>({...p,nota:e.target.value}))}/>
+          </div>
+        </div>
+        <button onClick={agregarPago} style={{background:V.gr,border:'none',color:'#fff',padding:'9px',borderRadius:7,cursor:'pointer',fontSize:13,fontWeight:600,width:'100%'}}>+ Registrar pago</button>
+      </div>
+
+      {todosPagos.length>0&&<div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Historial de pagos</div>
+        {todosPagos.slice(0,15).map((p,i)=>(
+          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${V.bo}`}}>
+            <div><div style={{fontSize:12,fontWeight:500}}>{p.dn}</div><div style={{fontSize:10,color:V.mu}}>{p.fecha}{p.nota?` · ${p.nota}`:''}</div></div>
+            <div style={{fontSize:13,fontWeight:700,color:V.gr}}>-{fmx(p.monto)}</div>
+          </div>
+        ))}
+      </div>}
+    </div>;
+  }
+
+  // ── REVISIONES ──
+  function RevTab(){
+    const [activa,setActiva]=useState(null);
+    const hoy=new Date();
+    const TC={mensual:V.go,trimestral:V.pu,anual:V.re};
+    return <div>
+      <div style={card}>
+        <div style={{fontSize:11,color:V.mu,letterSpacing:1,textTransform:'uppercase',marginBottom:12}}>Calendario de revisiones 2026</div>
+        {REVISIONES.map((rev,ri)=>{
+          const fR=new Date(rev.fecha),pasada=fR<hoy,dias=Math.ceil((fR-hoy)/(1000*60*60*24));
+          const notas=(S.revisiones_notas||{})[rev.fecha]||'';
+          const checks=(S.revisiones_checks||{})[rev.fecha]||{};
+          const cd=Object.values(checks).filter(Boolean).length;
+          const isA=activa===ri;
+          return <div key={ri} style={{marginBottom:6}}>
+            <div onClick={()=>setActiva(isA?null:ri)} style={{background:isA?V.s2:V.s1,border:`1px solid ${isA?TC[rev.tipo]:V.bo}`,borderRadius:10,padding:'11px 13px',cursor:'pointer',transition:'all .15s'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:2,flexWrap:'wrap'}}>
+                    <span style={{fontSize:12,fontWeight:600,color:pasada?V.mu:V.tx}}>{rev.titulo}</span>
+                    <span style={{fontSize:9,padding:'1px 6px',borderRadius:3,background:TC[rev.tipo]+'22',color:TC[rev.tipo],fontWeight:600,textTransform:'uppercase'}}>{rev.tipo}</span>
+                    {cd>0&&<span style={{fontSize:9,color:V.gr}}>{cd}/{rev.checklist.length} ✓</span>}
+                  </div>
+                  <div style={{fontSize:10,color:V.mu}}>{rev.desc}</div>
+                </div>
+                <div style={{textAlign:'right',flexShrink:0,marginLeft:10}}>
+                  <div style={{fontSize:11,color:pasada?V.mu:dias<=7?V.re:dias<=30?V.go:V.bl,fontWeight:600}}>{rev.fecha.split('-').reverse().join('/')}</div>
+                  {!pasada&&<div style={{fontSize:9,color:V.mu}}>{dias}d</div>}
+                  {pasada&&<div style={{fontSize:9,color:V.mu}}>Pasada</div>}
+                </div>
+              </div>
+            </div>
+            {isA&&<div style={{background:V.s2,border:`1px solid ${V.bo}`,borderRadius:'0 0 10px 10px',padding:'13px',marginTop:-3}}>
+              <div style={{fontSize:10,color:V.mu,marginBottom:8,textTransform:'uppercase',letterSpacing:1}}>Checklist</div>
+              {rev.checklist.map((item,ci)=>{
+                const done=checks[ci]||false;
+                return <div key={ci} onClick={()=>upd(s=>{if(!s.revisiones_checks)s.revisiones_checks={};if(!s.revisiones_checks[rev.fecha])s.revisiones_checks[rev.fecha]={};s.revisiones_checks[rev.fecha][ci]=!s.revisiones_checks[rev.fecha][ci];})}
+                  style={{display:'flex',alignItems:'flex-start',gap:9,padding:'6px 0',borderBottom:`1px solid ${V.bo}`,cursor:'pointer'}}>
+                  <div style={{width:17,height:17,borderRadius:4,background:done?V.gr:V.s3,border:`1px solid ${done?V.gr:V.bo2}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:'#fff',fontSize:10,marginTop:1}}>{done?'✓':''}</div>
+                  <span style={{fontSize:11,color:done?V.mu:V.tx,textDecoration:done?'line-through':'none'}}>{item}</span>
+                </div>;
+              })}
+              <div style={{marginTop:10}}>
+                <div style={{fontSize:10,color:V.mu,marginBottom:4}}>Notas de esta revisión</div>
+                <textarea style={{...inp,minHeight:70,resize:'vertical'}} value={notas} onChange={e=>upd(s=>{if(!s.revisiones_notas)s.revisiones_notas={};s.revisiones_notas[rev.fecha]=e.target.value;})} placeholder="¿Qué funcionó? ¿Qué ajustar? ¿Decisiones tomadas?"/>
+              </div>
+            </div>}
+          </div>;
+        })}
+      </div>
+    </div>;
+  }
+
+  const TABS=[{id:'dash',l:'Dashboard'},{id:'gym',l:'💪 Gym'},{id:'draw',l:'🎨 Dibujo'},{id:'hab',l:'✅ Hábitos'},{id:'deuda',l:'💰 Deuda'},{id:'revisiones',l:'📅 Revisiones'}];
+
+  return <div style={{background:V.bg,minHeight:'100vh',color:V.tx}}>
+    <div style={{background:V.s1,borderBottom:`1px solid ${V.bo}`,padding:'0 10px',display:'flex',alignItems:'center',gap:1,flexWrap:'wrap',position:'sticky',top:0,zIndex:100}}>
+      <div style={{fontSize:14,letterSpacing:3,color:V.re,padding:'11px 9px 11px 0',borderRight:`1px solid ${V.bo}`,marginRight:4,fontWeight:700}}>PJ</div>
+      {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:'none',border:'none',color:tab===t.id?V.tx:V.mu,fontSize:10,padding:'12px 7px',cursor:'pointer',borderBottom:`3px solid ${tab===t.id?V.re:'transparent'}`,fontWeight:tab===t.id?600:400,textTransform:'uppercase',letterSpacing:.3,whiteSpace:'nowrap'}}>{t.l}</button>)}
+    </div>
+    <div style={{padding:12,maxWidth:900,margin:'0 auto'}}>
+      {tab==='dash'&&<Dash/>}
+      {tab==='gym'&&<GymTab/>}
+      {tab==='draw'&&<DrawTab/>}
+      {tab==='hab'&&<HabTab/>}
+      {tab==='deuda'&&<DeudaTab/>}
+      {tab==='revisiones'&&<RevTab/>}
+    </div>
+    {toast&&<div style={{position:'fixed',bottom:14,right:14,background:toast.includes('Error')?V.re:V.gr,color:'#fff',padding:'7px 14px',borderRadius:20,fontSize:13,fontWeight:500,zIndex:999,pointerEvents:'none'}}>{toast}</div>}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
